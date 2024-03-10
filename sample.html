@@ -1,0 +1,122 @@
+<html>
+<body>
+<form name="myform" id="myform">
+  <input name="myfile" id="myfile" type="file"/>
+  <textarea name="output" cols="80" rows="10"></textarea>
+  <br>
+  <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
+
+  <div id="sankey_multiple" style="width: 900px; height: 300px;"></div>
+
+  <script type="text/javascript">
+
+  var form = document.forms.myform;
+
+  //XMLHttpRequestを使用したかったがChormeのセキュリティ問題でCrossエラー出たのでやめた
+  form.myfile.addEventListener( 'change', function(e) {
+
+    var fileDetail = e.target.files[0];
+
+    //FileReaderのインスタンスを作成する
+    var reader = new FileReader();
+
+    //読み込んだファイルの中身を取得する
+    reader.readAsText(fileDetail);
+
+    //ファイルの中身を取得後に処理を行う
+    reader.addEventListener( 'load', function() {
+      // 配列を定義
+      let csvArray = [];
+      // 改行ごとに配列化
+      let lines = reader.result.split(/\r\n|\n/);
+      // linesにある空やBlunkはここでまとめて削除
+      let cleanLines = lines.filter(Boolean)
+      // csv（lines）のヘッダー削除
+      cleanLines.shift();
+      // 1行ごとに処理→JSの二次関数に値を入れていく
+      for (let i = 0; i < cleanLines.length; ++i) {
+        let cells = cleanLines[i].split(",");
+        csvArray[i]=[];
+
+        // 各値毎に処理
+        for(j=0; j<cells.length; j++){
+          // Link l-id が「(none)」だった場合、Page Nameの値「Array[1] 」により変換する
+          if (j==0){
+            //法人まとめページのグルーピング
+            if (cells[j] == '(none)'){
+              switch(cells[1]) {
+                case "newcar:request_step1_model":
+                  csvArray[i][j] = "request_step1";
+                  break;
+                case "newcar:request_step2":
+                  csvArray[i][j] = "request_step1";
+                  break;
+                case "newcar:request_step3":
+                  csvArray[i][j] = "request_step2";
+                  break;
+                case "newcar:request_step4":
+                  csvArray[i][j] = "request_step3";
+                  break;
+                case "newcar:request_complete": //Step4削除後の遷移
+                  csvArray[i][j] = "request_step3";
+                  break;
+                case "newcar:request_step5":
+                  csvArray[i][j] = "request_step4";
+                  break;
+                default:
+                  csvArray[i][j]="None";
+                  break;
+              }
+              continue;
+            }
+          }
+
+          if (j==1){
+            csvArray[i][j]=cells[j].replace('newcar:', '');
+            continue;
+          }
+          csvArray[i][j]=cells[j];
+        }
+
+        // デバッグ用　削除予定
+        if (cells.length != 1) {
+          csvArray.push(cells);
+          //ファイルの中身をtextarea内に表示する
+          form.output.textContent = reader.result;
+        }
+      }
+
+      // sankeyの作成開始
+      google.charts.load("current", {packages:["sankey"]});
+      google.charts.setOnLoadCallback(drawChart);
+      function drawChart() {
+        var data = new google.visualization.DataTable();
+        data.addColumn('string', 'From');
+        data.addColumn('string', 'To');
+        data.addColumn('number', 'Weight');
+        // 二次関数から値を取り出してaddRowsに詰める
+        for(let i = 0; i < csvArray.length; ++i){
+          data.addRows([[
+            csvArray[i][0],
+            csvArray[i][1],
+            Number(csvArray[i][2])
+          ]]);
+        }
+
+        // Set chart options
+        var options = {
+          width: 1600,
+          height: 900
+        };
+
+        // Instantiate and draw our chart, passing in some options.
+        var chart = new google.visualization.Sankey(document.getElementById('sankey_multiple'));
+        chart.draw(data, options);
+      }
+    })
+  })
+
+  </script>
+</form>
+</body>
+</html>
